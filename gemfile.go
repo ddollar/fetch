@@ -3,10 +3,12 @@ package main
 import (
   "bufio"
   "fmt"
+  "io/ioutil"
   "os"
   "os/exec"
   "path/filepath"
   "regexp"
+  "strings"
 )
 
 type Gem interface {
@@ -109,7 +111,7 @@ func (gf *Gemfile) Install(home string) (err error) {
 
 func (gem *GitGem) Install(home string) (err error) {
   commit := gem.Commit[0:12]
-  target := filepath.Join(home, fmt.Sprintf("ruby/1.9.1/bundler/gems/%s-%s", gem.Name, commit))
+  target := filepath.Join(home, fmt.Sprintf("ruby/2.0.0/bundler/gems/%s-%s", gem.Name, commit))
   os.RemoveAll(target)
   os.MkdirAll(target, 0755)
   executeCommand(target, "git init")
@@ -120,13 +122,28 @@ func (gem *GitGem) Install(home string) (err error) {
 }
 
 func (gem *IndexGem) Install(home string) (err error) {
-  target := filepath.Join(home, fmt.Sprintf("ruby/1.9.1/gems/%s-%s", gem.Name, gem.Version))
+  gem_home, _ := filepath.Abs(filepath.Join(home, "ruby/2.0.0"))
+  cache_target := filepath.Join(home, fmt.Sprintf("ruby/2.0.0/cache"))
+  cache_file, _ := filepath.Abs(filepath.Join(cache_target, fmt.Sprintf("%s-%s.gem", gem.Name, gem.Version)))
+  gems_target := filepath.Join(home, fmt.Sprintf("ruby/2.0.0/gems/%s-%s", gem.Name, gem.Version))
+  spec_target := filepath.Join(home, fmt.Sprintf("ruby/2.0.0/specifications"))
+  spec_file, _ := filepath.Abs(filepath.Join(spec_target, fmt.Sprintf("%s-%s.gemspec", gem.Name, gem.Version)))
   url := fmt.Sprintf("%sgems/%s-%s.gem", gem.Remote, gem.Name, gem.Version)
-  os.RemoveAll(target)
-  os.MkdirAll(target, 0755)
-  executeCommand(target, fmt.Sprintf("curl -L %s | tar -xzvf -", url))
-  executeCommand(target, "tar -xzvf data.tar.gz")
-  executeCommand(target, "rm data.tar.gz metadata.gz")
+  os.MkdirAll(cache_target, 0755)
+  os.Remove(cache_file)
+  executeCommand(cache_target, fmt.Sprintf("curl -L -o %s %s", cache_file, url))
+  os.RemoveAll(gems_target)
+  os.MkdirAll(gems_target, 0755)
+  executeCommand(gems_target, fmt.Sprintf("tar -xzvf %s", cache_file))
+  executeCommand(gems_target, "tar -xzvf data.tar.gz && rm data.tar.gz")
+  executeCommand(gems_target, "gzip -d metadata.gz")
+  os.MkdirAll(spec_target, 0755)
+  executeCommand(gems_target, fmt.Sprintf("gem specification %s --ruby > %s", cache_file, spec_file))
+  bytes, _ := ioutil.ReadFile(filepath.Join(gems_target, "metadata"))
+  metadata := string(bytes)
+  if !strings.Contains(metadata, "extensions: []") {
+    executeCommand(gems_target, fmt.Sprintf("env GEM_HOME=%s ruby -e 'require \"rubygems/installer\"; Gem::Installer.new(\"../../cache/%s-%s.gem\").build_extensions'", gem_home, gem.Name, gem.Version))
+  }
   return
 }
 
@@ -146,4 +163,8 @@ func executeCommand(dir string, command string) {
   /* c.Stderr = os.Stderr*/
   c.Start()
   c.Wait()
+  if !c.ProcessState.Success() {
+    fmt.Printf("ERROR: %s\n", command)
+    os.Exit(2)
+  }
 }
