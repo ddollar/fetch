@@ -20,7 +20,7 @@ const (
 type Gem interface {
 	Banner() string
 	Install(root string)
-	InstallState() (GemInstallState)
+	InstallState() GemInstallState
 }
 
 type GitGem struct {
@@ -40,7 +40,7 @@ type IndexGem struct {
 
 /** GitGem ******************************************************************/
 
-func (gem *GitGem) Banner() (string) {
+func (gem *GitGem) Banner() string {
 	return fmt.Sprintf("%s (%s) from %s#%s", gem.Name, gem.Version, gem.Remote, gem.Commit[0:12])
 }
 
@@ -53,7 +53,7 @@ func (gem *GitGem) Install(root string) {
 	}
 }
 
-func (gem *GitGem) InstallState() (GemInstallState) {
+func (gem *GitGem) InstallState() GemInstallState {
 	return gem.State
 }
 
@@ -61,10 +61,10 @@ func (gem *GitGem) install(root string) {
 	install_dir := gem.installDir(root)
 	os.RemoveAll(install_dir)
 	os.MkdirAll(install_dir, 0755)
-	Execute(Cmd{ Dir:install_dir, Command:"git init" })
-	Execute(Cmd{ Dir:install_dir, Command:fmt.Sprintf("git remote add origin %s", gem.Remote) })
-	Execute(Cmd{ Dir:install_dir, Command:"git fetch origin" })
-	Execute(Cmd{ Dir:install_dir, Command:fmt.Sprintf("git checkout %s", gem.Commit) })
+	Execute(Cmd{Dir: install_dir, Command: "git init"})
+	Execute(Cmd{Dir: install_dir, Command: fmt.Sprintf("git remote add origin %s", gem.Remote)})
+	Execute(Cmd{Dir: install_dir, Command: "git fetch origin"})
+	Execute(Cmd{Dir: install_dir, Command: fmt.Sprintf("git checkout %s", gem.Commit)})
 }
 
 func (gem *GitGem) createSpecification(root string) {
@@ -73,7 +73,7 @@ func (gem *GitGem) createSpecification(root string) {
 	spec_file := gem.specificationFile(root)
 	os.MkdirAll(spec_dir, 0755)
 	os.Remove(spec_file)
-	Execute(Cmd{ Dir:install_dir, Command:fmt.Sprintf("ruby -e 'puts eval(File.read(\"%s.gemspec\")).to_ruby' > %s", gem.Name, spec_file) })
+	Execute(Cmd{Dir: install_dir, Command: fmt.Sprintf("ruby -e 'puts eval(File.read(\"%s.gemspec\")).to_ruby' > %s", gem.Name, spec_file)})
 }
 
 func (gem *GitGem) installDir(root string) (dir string) {
@@ -110,7 +110,7 @@ func (gem *IndexGem) Install(root string) {
 	}
 }
 
-func (gem *IndexGem) InstallState() (GemInstallState) {
+func (gem *IndexGem) InstallState() GemInstallState {
 	return gem.State
 }
 
@@ -119,16 +119,16 @@ func (gem *IndexGem) cache(root string) {
 	cache_file := gem.cacheFile(root)
 	os.MkdirAll(cache_dir, 0755)
 	os.Remove(cache_file)
-	Execute(Cmd{ Command:fmt.Sprintf("curl -L -o %s %s", cache_file, gem.remoteUrl()) })
+	Execute(Cmd{Command: fmt.Sprintf("curl -L -o %s %s", cache_file, gem.remoteUrl())})
 }
 
 func (gem *IndexGem) install(root string) {
 	install_dir := gem.installDir(root)
 	os.RemoveAll(install_dir)
 	os.MkdirAll(install_dir, 0755)
-	Execute(Cmd{ Dir:install_dir, Command:fmt.Sprintf("tar -xzvf %s", gem.cacheFile(root)) })
-	Execute(Cmd{ Dir:install_dir, Command:"tar -xzvf data.tar.gz && rm data.tar.gz" })
-	Execute(Cmd{ Dir:install_dir, Command:"gzip -d metadata.gz" })
+	Execute(Cmd{Dir: install_dir, Command: fmt.Sprintf("tar -xzvf %s", gem.cacheFile(root))})
+	Execute(Cmd{Dir: install_dir, Command: "tar -xzvf data.tar.gz && rm data.tar.gz"})
+	Execute(Cmd{Dir: install_dir, Command: "gzip -d metadata.gz"})
 }
 
 func (gem *IndexGem) createSpecification(root string) {
@@ -137,7 +137,7 @@ func (gem *IndexGem) createSpecification(root string) {
 	spec_file := gem.specificationFile(root)
 	os.MkdirAll(spec_dir, 0755)
 	os.Remove(spec_file)
-	Execute(Cmd{ Command:fmt.Sprintf("gem specification %s --ruby > %s", cache_file, spec_file) })
+	Execute(Cmd{Command: fmt.Sprintf("gem specification %s --ruby > %s", cache_file, spec_file)})
 }
 
 func (gem *IndexGem) compileExtensions(root string) {
@@ -146,7 +146,7 @@ func (gem *IndexGem) compileExtensions(root string) {
 	spec_file := gem.specificationFile(root)
 	spec_bytes, _ := ioutil.ReadFile(spec_file)
 	if !strings.Contains(string(spec_bytes), "extensions: []") {
-	  Execute(Cmd{ Dir:install_dir, Command:fmt.Sprintf("env GEM_HOME=%s ruby -e 'require \"rubygems/installer\"; Gem::Installer.new(\"%s\").build_extensions'", root, cache_file) })
+		Execute(Cmd{Dir: install_dir, Command: fmt.Sprintf("env GEM_HOME=%s ruby -e 'require \"rubygems/installer\"; Gem::Installer.new(\"%s\").build_extensions'", root, cache_file)})
 	}
 }
 
@@ -154,7 +154,7 @@ func (gem *IndexGem) createBinstubs(root string) {
 	bin_dir := gem.binDir(root)
 	os.MkdirAll(bin_dir, 0755)
 	buffer := new(bytes.Buffer)
-	Execute(Cmd{ Command:fmt.Sprintf("ruby -e 'puts eval(File.read(\"%s\")).executables'", gem.specificationFile(root)), Output:buffer })
+	Execute(Cmd{Command: fmt.Sprintf("ruby -e 'puts eval(File.read(\"%s\")).executables'", gem.specificationFile(root)), Output: buffer})
 	scanner := bufio.NewScanner(buffer)
 	for scanner.Scan() {
 		bin := scanner.Text()
@@ -187,7 +187,7 @@ func (gem *IndexGem) installDir(root string) (dir string) {
 	return
 }
 
-func (gem *IndexGem) remoteUrl() (string) {
+func (gem *IndexGem) remoteUrl() string {
 	return fmt.Sprintf("%sgems/%s-%s.gem", gem.Remote, gem.Name, gem.Version)
 }
 

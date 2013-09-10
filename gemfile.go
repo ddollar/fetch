@@ -86,20 +86,20 @@ func (gf *Gemfile) Install(root string) (err error) {
 	}
 	for i := 0; i < len(gf.Gems); i++ {
 		gem := <-ch
-		switch(gem.InstallState()) {
+		switch gem.InstallState() {
 		case INSTALLED:
 			fmt.Printf("Installed %s\n", gem.Banner())
 		case SKIPPED:
 			fmt.Printf("Skipped %s\n", gem.Banner())
 		}
 	}
-	Execute(Cmd{ Command:fmt.Sprintf("bundle config --local path %s", root) })
+	Execute(Cmd{Command: fmt.Sprintf("bundle config --local path %s", root)})
 	return
 }
 
 func (gf *Gemfile) apiVersion() (version string) {
 	buffer := new(bytes.Buffer)
-	Execute(Cmd{ Command:"ruby -e 'print Gem::ConfigMap[:ruby_version]'", Output:buffer })
+	Execute(Cmd{Command: "ruby -e 'print Gem::ConfigMap[:ruby_version]'", Output: buffer})
 	return buffer.String()
 }
 

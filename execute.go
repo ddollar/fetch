@@ -8,10 +8,10 @@ import (
 )
 
 type Cmd struct {
-	Dir string
+	Dir     string
 	Command string
-	Env map[string]string
-	Output io.Writer
+	Env     map[string]string
+	Output  io.Writer
 }
 
 func Execute(cmd Cmd) {
