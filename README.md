@@ -1,6 +1,6 @@
 ## fetch
 
-Fetch is designed to install everything specified by a `Gemfile.lock` into a subdirectory called `vendor/bundle` and then configure bundle to look there when resolving gems at runtime.
+Fetch is designed to install everything specified by a `Gemfile.lock` into a subdirectory called `vendor/bundle` and then configure Bundler to use that directory during runtime.
 
 Fetch is not designed to be used during development or whenever your `Gemfile` is changing. Fetch is designed to be used once you have a `Gemfile.lock`, (e.g. during deploys to production)
 
