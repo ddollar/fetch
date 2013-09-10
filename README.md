@@ -10,6 +10,11 @@ Fetch will download and install the gems specified in your Gemfile.lock and then
 
 #### FETCH IS HIGHLY EXPERIMENTAL AND MAY BREAK EVERYTHING YOU OWN
 
+### Known Limitations
+
+* Fetch will not compile binary extensions on gems from git sources
+* Fetch will not create binstubs for gems from git sources
+
 ### Installation
 
 ##### Compile from Source
