@@ -39,7 +39,6 @@ var topicRegexp = regexp.MustCompile("^[A-Z]+$")
 var gitRemoteRegexp = regexp.MustCompile("^  remote: (.+)$")
 var gitRevisionRegexp = regexp.MustCompile("^  revision: ([0-9a-f]+)$")
 var gemRegexp = regexp.MustCompile("^    ([A-Za-z0-9\\.\\-\\_]+?) \\(([^)]+)\\)$")
-/* var extensionRegexp = regexp.MustCompile("^  s.executables = \\[(.+)\\]$")*/
 var extensionRegexp = regexp.MustCompile("\n  s.executables = \\[(.+)\\]\n")
 
 func ReadGemfileLock(filename string) (gf *Gemfile, err error) {
