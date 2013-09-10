@@ -15,18 +15,20 @@ import (
 type Gem interface {
 	Install(string, string) error
 	Banner() string
+	Name() string
+	Version() string
 }
 
 type GitGem struct {
-	Name    string
-	Version string
+	name    string
+	version string
 	Remote  string
 	Commit  string
 }
 
 type IndexGem struct {
-	Name    string
-	Version string
+	name    string
+	version string
 	Remote  string
 }
 
@@ -74,8 +76,8 @@ func ReadGemfileLock(filename string) (gf *Gemfile, err error) {
 			}
 			if parts := gemRegexp.FindStringSubmatch(scanner.Text()); len(parts) > 0 {
 				gem := new(GitGem)
-				gem.Name = parts[1]
-				gem.Version = parts[2]
+				gem.name = parts[1]
+				gem.version = parts[2]
 				gem.Remote = remote
 				gem.Commit = revision
 				gf.Gems = append(gf.Gems, gem)
@@ -86,8 +88,8 @@ func ReadGemfileLock(filename string) (gf *Gemfile, err error) {
 			}
 			if parts := gemRegexp.FindStringSubmatch(scanner.Text()); len(parts) > 0 {
 				gem := new(IndexGem)
-				gem.Name = parts[1]
-				gem.Version = parts[2]
+				gem.name = parts[1]
+				gem.version = parts[2]
 				gem.Remote = remote
 				gf.Gems = append(gf.Gems, gem)
 			}
@@ -129,12 +131,9 @@ func (gem *GitGem) Install(home string, api string) (err error) {
 
 func (gem *IndexGem) Install(home string, api string) (err error) {
 	cache_target := filepath.Join(home, fmt.Sprintf("ruby/%s/cache", api))
-	cache_file, _ := filepath.Abs(filepath.Join(cache_target, fmt.Sprintf("%s-%s.gem", gem.Name, gem.Version)))
-	gems_target := filepath.Join(home, fmt.Sprintf("ruby/%s/gems/%s-%s", api, gem.Name, gem.Version))
-	spec_target := filepath.Join(home, fmt.Sprintf("ruby/%s/specifications", api))
-	spec_file, _ := filepath.Abs(filepath.Join(spec_target, fmt.Sprintf("%s-%s.gemspec", gem.Name, gem.Version)))
-	bin_target := filepath.Join(home, fmt.Sprintf("ruby/%s/bin", api))
-	url := fmt.Sprintf("%sgems/%s-%s.gem", gem.Remote, gem.Name, gem.Version)
+	cache_file, _ := filepath.Abs(filepath.Join(cache_target, fmt.Sprintf("%s-%s.gem", gem.Name(), gem.Version())))
+	gems_target := filepath.Join(home, fmt.Sprintf("ruby/%s/gems/%s-%s", api, gem.Name(), gem.Version()))
+	url := fmt.Sprintf("%sgems/%s-%s.gem", gem.Remote, gem.Name(), gem.Version())
 	os.MkdirAll(cache_target, 0755)
 	os.Remove(cache_file)
 	executeCommand(cache_target, fmt.Sprintf("curl -L -o %s %s", cache_file, url))
@@ -143,31 +142,34 @@ func (gem *IndexGem) Install(home string, api string) (err error) {
 	executeCommand(gems_target, fmt.Sprintf("tar -xzvf %s", cache_file))
 	executeCommand(gems_target, "tar -xzvf data.tar.gz && rm data.tar.gz")
 	executeCommand(gems_target, "gzip -d metadata.gz")
-	os.MkdirAll(spec_target, 0755)
-	executeCommand(gems_target, fmt.Sprintf("gem specification %s --ruby > %s", cache_file, spec_file))
-	bytes, _ := ioutil.ReadFile(filepath.Join(gems_target, "metadata"))
-	metadata := string(bytes)
-	gem_home, _ := filepath.Abs(filepath.Join(home, fmt.Sprintf("ruby/%s", api)))
-	if !strings.Contains(metadata, "extensions: []") {
-		executeCommand(gems_target, fmt.Sprintf("env GEM_HOME=%s ruby -e 'require \"rubygems/installer\"; Gem::Installer.new(\"../../cache/%s-%s.gem\").build_extensions'", gem_home, gem.Name, gem.Version))
-	}
-	os.MkdirAll(bin_target, 0755)
-	bytes, _ = ioutil.ReadFile(spec_file)
-	if parts := extensionRegexp.FindStringSubmatch(string(bytes)); len(parts) > 0 {
-		for _, binary := range strings.Split(strings.Replace(strings.Replace(parts[1], " ", "", -1), "\"", "", -1), ",") {
-			bin_file, _ := filepath.Abs(filepath.Join(bin_target, binary))
-			writeBinstub(bin_file, gem.Name, binary)
-		}
-	}
+	createSpecification(gem, home, api)
+	compileExtensions(gem, home, api)
+	createBinstubs(gem, home, api)
 	return
 }
 
+func (gem *GitGem) Name() string {
+	return gem.name
+}
+
+func (gem *IndexGem) Name() string {
+	return gem.name
+}
+
+func (gem *GitGem) Version() string {
+	return gem.version
+}
+
+func (gem *IndexGem) Version() string {
+	return gem.version
+}
+
 func (gem *GitGem) Banner() string {
-	return fmt.Sprintf("%s (%s) from %s#%s", gem.Name, gem.Version, gem.Remote, gem.Commit[0:12])
+	return fmt.Sprintf("%s (%s) from %s#%s", gem.Name(), gem.Version(), gem.Remote, gem.Commit[0:12])
 }
 
 func (gem *IndexGem) Banner() string {
-	return fmt.Sprintf("%s (%s) from %s", gem.Name, gem.Version, gem.Remote)
+	return fmt.Sprintf("%s (%s) from %s", gem.Name(), gem.Version(), gem.Remote)
 }
 
 func executeCommand(dir string, command string) {
@@ -193,6 +195,40 @@ func executeCommandOutput(dir string, command string) string {
 	c.Start()
 	c.Wait()
 	return buffer.String()
+}
+
+func createSpecification(gem Gem, home string, api string) {
+	cache_target := filepath.Join(home, fmt.Sprintf("ruby/%s/cache", api))
+	cache_file, _ := filepath.Abs(filepath.Join(cache_target, fmt.Sprintf("%s-%s.gem", gem.Name(), gem.Version())))
+	gems_target := filepath.Join(home, fmt.Sprintf("ruby/%s/gems/%s-%s", api, gem.Name(), gem.Version()))
+	spec_target := filepath.Join(home, fmt.Sprintf("ruby/%s/specifications", api))
+	spec_file, _ := filepath.Abs(filepath.Join(spec_target, fmt.Sprintf("%s-%s.gemspec", gem.Name(), gem.Version())))
+	os.MkdirAll(spec_target, 0755)
+	executeCommand(gems_target, fmt.Sprintf("gem specification %s --ruby > %s", cache_file, spec_file))
+}
+
+func compileExtensions(gem Gem, home string, api string) {
+	gems_target := filepath.Join(home, fmt.Sprintf("ruby/%s/gems/%s-%s", api, gem.Name(), gem.Version()))
+	bytes, _ := ioutil.ReadFile(filepath.Join(gems_target, "metadata"))
+	metadata := string(bytes)
+	gem_home, _ := filepath.Abs(filepath.Join(home, fmt.Sprintf("ruby/%s", api)))
+	if !strings.Contains(metadata, "extensions: []") {
+		executeCommand(gems_target, fmt.Sprintf("env GEM_HOME=%s ruby -e 'require \"rubygems/installer\"; Gem::Installer.new(\"../../cache/%s-%s.gem\").build_extensions'", gem_home, gem.Name(), gem.Version()))
+	}
+}
+
+func createBinstubs(gem Gem, home string, api string) {
+	bin_target := filepath.Join(home, fmt.Sprintf("ruby/%s/bin", api))
+	spec_target := filepath.Join(home, fmt.Sprintf("ruby/%s/specifications", api))
+	spec_file, _ := filepath.Abs(filepath.Join(spec_target, fmt.Sprintf("%s-%s.gemspec", gem.Name, gem.Version)))
+	os.MkdirAll(bin_target, 0755)
+	bytes, _ := ioutil.ReadFile(spec_file)
+	if parts := extensionRegexp.FindStringSubmatch(string(bytes)); len(parts) > 0 {
+		for _, binary := range strings.Split(strings.Replace(strings.Replace(parts[1], " ", "", -1), "\"", "", -1), ",") {
+			bin_file, _ := filepath.Abs(filepath.Join(bin_target, binary))
+			writeBinstub(bin_file, gem.Name(), binary)
+		}
+	}
 }
 
 func writeBinstub(filename string, gem string, binary string) {
