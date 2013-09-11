@@ -126,7 +126,7 @@ func (gem *IndexGem) install(root string) {
 	install_dir := gem.installDir(root)
 	os.RemoveAll(install_dir)
 	os.MkdirAll(install_dir, 0755)
-	Execute(Cmd{Dir: install_dir, Command: fmt.Sprintf("tar -xzvf %s", gem.cacheFile(root))})
+	Execute(Cmd{Dir: install_dir, Command: fmt.Sprintf("tar xvf %s", gem.cacheFile(root))})
 	Execute(Cmd{Dir: install_dir, Command: "tar -xzvf data.tar.gz && rm data.tar.gz"})
 	Execute(Cmd{Dir: install_dir, Command: "gzip -d metadata.gz"})
 }
